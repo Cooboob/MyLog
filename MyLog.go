@@ -16,13 +16,25 @@ type logInfo struct {
 	length int64
 }
 
+type LOGLEVEL int
+
+const (
+	filePerm         os.FileMode = 0666
+	LogLevel_DEBUG   LOGLEVEL    = 1
+	LogLevel_WARNING LOGLEVEL    = 2
+	LogLevel_INFO    LOGLEVEL    = 4
+	LogLevel_ERROR   LOGLEVEL    = 8
+	LogLevel_ALL     LOGLEVEL    = 15
+)
+
 var LogFile = `out` // log file name
 var LogPath = ``    // log file sotre path
 var LogExt = `.log` // log file ext
 
 var LogMaxSize int64 = 1024 * 5 * 1024 // default single log file size (MB)
 var LogBackupLimit = 30                // default log keep days
-var LogLevel = 0                       // todo log output filter
+var LogLevel LOGLEVEL = LogLevel_ALL
+var NoFileOutput = false // print log info to console only
 
 var messageChan = make(chan logInfo, 1024)
 
@@ -114,7 +126,7 @@ func cleanLogFile() {
 			}
 			n := strings.Split(fn, LogFile)
 			if len(n) >= 2 && len(n[1]) >= 9 {
-				dateStr := n[len(n)-1][1:9] // 最后一个是 _dddddddd_xx.xxx 或 .xxx
+				dateStr := n[len(n)-1][1:9] // log file name will be end with _dddddddd_xx.xxx or .xxx
 				l, _ := time.LoadLocation("Local")
 				d, err := time.ParseInLocation("20060102", dateStr, l)
 				if err != nil {
@@ -122,7 +134,7 @@ func cleanLogFile() {
 				}
 				s := int(time.Now().Sub(d).Hours() / 24)
 				//fmt.Println(dateStr,s)
-				if s >= LogBackupLimit { // >= 是因为如果设置为 30, 10.01与10.31为30
+				if s >= LogBackupLimit { // >= if we set 30, the days between 10.01 and 10.31 is 30
 					err = os.Remove(filepath.Join(LogPath, fi.Name()))
 					if err != nil {
 						fmt.Println(`error to delete old log: ` + err.Error())
@@ -168,7 +180,7 @@ func openLogFile(path string, dataLen int64) (*os.File, int64, error) {
 			fileLen = 0
 		}
 	}
-	retFile, _ = os.OpenFile(fullPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	retFile, _ = os.OpenFile(fullPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, filePerm)
 
 	return retFile, fileLen, nil
 }
@@ -185,7 +197,7 @@ func getLogPath() string {
 	}
 
 	if fi, err := os.Stat(LogPath); err != nil || !fi.IsDir() {
-		err = os.MkdirAll(LogPath, 0666)
+		err = os.MkdirAll(LogPath, filePerm)
 		if err != nil {
 			panic(`error to create log path: ` + err.Error())
 		}
@@ -195,19 +207,27 @@ func getLogPath() string {
 }
 
 func Info(info string) {
-	writeLog(`[INFO]`, info)
+	if LogLevel&LogLevel_INFO > 0 {
+		writeLog(`[INFO]`, info)
+	}
 }
 
 func Warning(info string) {
-	writeLog(`[WARNING]`, info)
+	if LogLevel&LogLevel_WARNING > 0 {
+		writeLog(`[WARNING]`, info)
+	}
 }
 
 func Error(info string) {
-	writeLog(`[ERROR]`, info)
+	if LogLevel&LogLevel_ERROR > 0 {
+		writeLog(`[ERROR]`, info)
+	}
 }
 
 func Debug(info string) {
-	writeLog(`[DEBUG]`, info)
+	if LogLevel&LogLevel_DEBUG > 0 {
+		writeLog(`[DEBUG]`, info)
+	}
 }
 
 func writeLog(level string, info string) {
@@ -225,7 +245,10 @@ func writeLog(level string, info string) {
 		msg:    strBuffer.Bytes(),
 		length: int64(strBuffer.Len()),
 	}
-	messageChan <- li
+
+	if !NoFileOutput {
+		messageChan <- li
+	}
 	_, err := os.Stdout.Write(strBuffer.Bytes())
 	if err != nil {
 		fmt.Println(`error to print log info: ` + err.Error())
