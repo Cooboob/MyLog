@@ -28,7 +28,7 @@ const (
 )
 
 var LogFile = `out` // log file name
-var LogPath = ``    // log file sotre path
+var LogPath = ``    // log file store path
 var LogExt = `.log` // log file ext
 
 var LogMaxSize int64 = 1024 * 5 * 1024 // default single log file size (MB)
@@ -108,7 +108,7 @@ func goWriter() {
 }
 
 func cleanLogFile() {
-	if LogBackupLimit == 0 {
+	if LogBackupLimit == 0 || NoFileOutput {
 		return
 	}
 	rd, err := ioutil.ReadDir(LogPath)
