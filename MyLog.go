@@ -125,7 +125,7 @@ func cleanLogFile() {
 				continue
 			}
 			n := strings.Split(fn, LogFile)
-			if len(n) >= 2 && len(n[1]) >= 9 {
+			if len(n) >= 2 && len(n[len(n)-1]) >= 9 {
 				dateStr := n[len(n)-1][1:9] // log file name will be end with _dddddddd_xx.xxx or .xxx
 				l, _ := time.LoadLocation("Local")
 				d, err := time.ParseInLocation("20060102", dateStr, l)
